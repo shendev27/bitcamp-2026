@@ -32,6 +32,7 @@ class SpotifyController:
         self._fade_thread: threading.Thread | None = None
         self._last_start_ms: int | None = None
         self._last_track_index: int | None = None
+        self._last_track_id: str | None = None   # used to detect natural track advance
 
     def connect(self):
         """Authenticate via Authorization Code Flow.  Stores token cache in .cache."""
@@ -66,7 +67,7 @@ class SpotifyController:
         except Exception as exc:
             print(f"[SPOTIFY] Device check failed: {exc}")
 
-    def play_mood(self, mood: str):
+    def play_mood(self, mood: str, immediate: bool = False):
         """Start playback for a mood using configured playlist and offsets."""
         if mood not in ACTION_MAP:
             return
@@ -74,16 +75,20 @@ class SpotifyController:
         choices = MOOD_TRACK_STARTS.get(mood) or []
         if choices:
             track_index, start_ms = random.choice(choices)
-            self.play_playlist(playlist_uri, track_index=track_index, position_ms=start_ms)
+            self.play_playlist(playlist_uri, track_index=track_index,
+                               position_ms=start_ms, immediate=immediate)
         else:
-            self.play_playlist(playlist_uri)
+            self.play_playlist(playlist_uri, immediate=immediate)
 
-    def play_playlist(self, playlist_uri: str, track_index: int | None = None, position_ms: int | None = None):
+    def play_playlist(self, playlist_uri: str, track_index: int | None = None,
+                      position_ms: int | None = None, immediate: bool = False):
         """Switch playback to the given playlist URI (context)."""
         if not self._sp or "REPLACE_WITH" in playlist_uri:
+            print(f"[SPOTIFY] play_playlist skipped: sp={self._sp is not None} uri={playlist_uri[:40]}")
             return
         position_ms = int(position_ms or 0)
-        if SPOTIFY_FADE_MS <= 0 or SPOTIFY_FADE_STEPS < 2:
+        # immediate=True (button press) or fade disabled → play directly, skip fade guard
+        if immediate or SPOTIFY_FADE_MS <= 0 or SPOTIFY_FADE_STEPS < 2:
             self._start_playback(playlist_uri, track_index, position_ms)
             return
         if self._fade_thread and self._fade_thread.is_alive():
@@ -102,6 +107,12 @@ class SpotifyController:
             if not pb or not pb.get("item"):
                 return _BLANK_TRACK
             item = pb["item"]
+            track_id = item.get("id")
+            # Clear start metadata when Spotify has naturally advanced to a different track
+            if track_id and track_id != self._last_track_id:
+                self._last_track_id = track_id
+                self._last_start_ms = None
+                self._last_track_index = None
             art = item["album"]["images"][0]["url"] if item["album"]["images"] else ""
             artists = ", ".join(a["name"] for a in item["artists"])
             return {
@@ -121,21 +132,33 @@ class SpotifyController:
     # internals
 
     def _start_playback(self, playlist_uri: str, track_index: int | None, position_ms: int):
+        kwargs: dict = {"context_uri": playlist_uri}
+        if track_index is not None:
+            kwargs["offset"] = {"position": max(0, int(track_index) - 1)}
+        if position_ms > 0:
+            kwargs["position_ms"] = max(0, int(position_ms))
         try:
-            kwargs: dict = {"context_uri": playlist_uri}
-            if track_index is not None:
-                track_pos = max(0, int(track_index) - 1)
-                kwargs["offset"] = {"position": track_pos}
-            if position_ms > 0:
-                kwargs["position_ms"] = max(0, int(position_ms))
             self._sp.start_playback(**kwargs)
             self._active = True
-            self._last_start_ms = kwargs.get("position_ms", 0)
+            self._last_start_ms = kwargs.get("position_ms") or 0
             self._last_track_index = track_index
+            self._last_track_id = None   # will be set on next current_track() call
         except spotipy.SpotifyException as exc:
-            if "NO_ACTIVE_DEVICE" in str(exc):
+            err = str(exc)
+            if "NO_ACTIVE_DEVICE" in err:
                 print("[SPOTIFY] No active device - cannot switch playlist.")
                 self._active = False
+            elif "offset" in err.lower() or "range" in err.lower() or "404" in err:
+                # Playlist shorter than expected — retry without offset
+                print(f"[SPOTIFY] Offset out of range, retrying without offset: {exc}")
+                try:
+                    self._sp.start_playback(context_uri=playlist_uri)
+                    self._active = True
+                    self._last_start_ms = None
+                    self._last_track_index = None
+                    self._last_track_id = None
+                except spotipy.SpotifyException as exc2:
+                    print(f"[SPOTIFY] Fallback playback error: {exc2}")
             else:
                 print(f"[SPOTIFY] Playback error: {exc}")
 

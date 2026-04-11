@@ -25,6 +25,7 @@ _latest_state: dict = {}
 _current_hex: str = ACTION_MAP["dead"][1]
 _manual_mood: str | None = None
 _manual_until: float = 0.0
+_manual_commentary: str = ""
 
 
 @asynccontextmanager
@@ -48,13 +49,18 @@ app.add_middleware(
 
 @app.post("/debug/mood/{mood}")
 async def debug_set_mood(mood: str, seconds: int = 60):
-    """Temporary mood override for UI testing."""
-    global _manual_mood, _manual_until
+    """Temporary mood override for UI testing — also triggers a song change."""
+    global _manual_mood, _manual_until, _manual_commentary
     if mood not in ACTION_MAP:
         return {"ok": False, "error": "unknown mood"}
     seconds = max(5, min(300, int(seconds)))
     _manual_mood = mood
     _manual_until = time.time() + seconds
+    _manual_commentary = random.choice(COMMENTARY[mood])
+    # Run blocking Spotify call in a thread so we don't stall the event loop.
+    # immediate=True bypasses the fade-thread guard so button presses always fire.
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(None, lambda: spotify.play_mood(mood, immediate=True))
     return {"ok": True, "mood": mood, "until": _manual_until}
 
 
@@ -75,7 +81,7 @@ async def _brain_loop():
             mood = _manual_mood
             state["mood"] = mood
             state["action_reason"] = f"Manual override -> {mood}"
-            state["commentary"] = random.choice(COMMENTARY[mood])
+            state["commentary"] = _manual_commentary   # picked once at override start
         elif _manual_mood and now >= _manual_until:
             _manual_mood = None
 
