@@ -31,7 +31,8 @@ _manual_commentary: str = ""
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     vision.start()
-    spotify.connect()
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(None, spotify.connect)
     asyncio.create_task(_brain_loop())
     yield
     vision.stop()
