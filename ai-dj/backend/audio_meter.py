@@ -32,8 +32,8 @@ class AudioMeter:
             if indata is None or len(indata) == 0:
                 return
             rms = float(np.sqrt(np.mean(np.square(indata))))
-            # Scale to 0–1 (tuned conservatively; DJBrain doubles it).
-            level = min(1.0, rms * 6.0)
+            # Scale to 0–1 (very hot; DJBrain also scales loudness).
+            level = min(1.0, rms * 36.0)
             with self._lock:
                 self._level = (self._level * 0.8) + (level * 0.2)
 

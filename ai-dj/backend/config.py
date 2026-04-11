@@ -9,17 +9,18 @@ load_dotenv()
 WEBCAM_INDEX = int(os.getenv("WEBCAM_INDEX", 0))
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
-CAPTURE_FPS = 8
+CAPTURE_FPS = 6
 BROADCAST_HZ = 4
 
 # ── YOLO ──────────────────────────────────────────────────────────────────────
 YOLO_MODEL = "yolov8n.pt"
-YOLO_IMGSZ = 480
+YOLO_IMGSZ = 320
 YOLO_CONF = 0.4
+YOLO_EVERY_N = int(os.getenv("YOLO_EVERY_N", 2))  # 6 fps / 2 = 3 yolo runs/sec
 
 # ── Emotion ───────────────────────────────────────────────────────────────────
 MAX_FACES = 5
-EMOTION_EVERY_N = 5          # run DeepFace every Nth frame per slot
+EMOTION_EVERY_N = 9          # ~1 emotion run / 3 seconds at 3 yolo runs/sec
 
 # ── DJ Brain ──────────────────────────────────────────────────────────────────
 PEOPLE_NORM = 8.0            # crowd size that = "full"
