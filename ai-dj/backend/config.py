@@ -35,11 +35,50 @@ MOOD_BANDS = {
 
 # ── Action Map  state → (playlist_uri, hex_color, brightness 0-254, effect) ──
 ACTION_MAP = {
-    "dead":    ("spotify:playlist:REPLACE_WITH_LOFI_URI",       "#1a1a40", 60,  "static"),
-    "chill":   ("spotify:playlist:REPLACE_WITH_CHILLHOP_URI",   "#2d4a7a", 100, "slow_breathe"),
-    "neutral": ("spotify:playlist:REPLACE_WITH_INDIEPOP_URI",   "#4a7a4a", 150, "static"),
-    "hype":    ("spotify:playlist:REPLACE_WITH_EDM_URI",        "#ff6600", 220, "pulse"),
-    "peak":    ("spotify:playlist:REPLACE_WITH_FESTIVAL_URI",   "#ff0066", 254, "strobe"),
+    "dead":    ("spotify:playlist:16gsF9eLsg6A4zo4kD0teG", "#1a1a40", 60,  "static"),
+    "chill":   ("spotify:playlist:44BQqhiH8baSBRuReESa07", "#2d4a7a", 100, "slow_breathe"),
+    "neutral": ("spotify:playlist:4cTjO8JzLx1vmopCfNrxTm", "#4a7a4a", 150, "static"),
+    "hype":    ("spotify:playlist:0ENJ8AFAuJLEhCzYx5n6yY", "#ff6600", 220, "pulse"),
+    "peak":    ("spotify:playlist:2JS5ZJS4WsMOqDt07uWaHK", "#ff0066", 254, "strobe"),
+}
+
+# Track start offsets (1-based track index, position_ms)
+MOOD_TRACK_STARTS = {
+    "dead": [
+        (1, 0_000),
+        (2, 25_000),
+        (3, 33_000),
+        (4, 0_000),
+        (5, 2_000),
+    ],
+    "chill": [
+        (1, 106_000),
+        (2, 54_000),
+        (3, 26_000),
+        (4, 11_000),
+        (5, 23_000),
+    ],
+    "neutral": [
+        (1, 105_000),
+        (2, 68_000),
+        (3, 50_000),
+        (4, 0_000),
+        (5, 27_000),
+    ],
+    "hype": [
+        (1, 0_000),
+        (2, 95_000),
+        (3, 17_000),
+        (4, 0_000),
+        (5, 16_000),
+    ],
+    "peak": [
+        (1, 61_000),
+        (2, 20_000),
+        (3, 0_000),
+        (4, 151_000),
+        (5, 12_000),
+    ],
 }
 
 # ── DJ Commentary (no LLM — simple templates) ─────────────────────────────────
@@ -76,6 +115,8 @@ SPOTIPY_CLIENT_ID     = os.getenv("SPOTIPY_CLIENT_ID", "")
 SPOTIPY_CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET", "")
 SPOTIPY_REDIRECT_URI  = os.getenv("SPOTIPY_REDIRECT_URI", "http://localhost:8888/callback")
 SPOTIFY_SCOPES        = "user-modify-playback-state user-read-playback-state"
+SPOTIFY_FADE_MS       = int(os.getenv("SPOTIFY_FADE_MS", 1200))
+SPOTIFY_FADE_STEPS    = int(os.getenv("SPOTIFY_FADE_STEPS", 6))
 
 # ── Hue ───────────────────────────────────────────────────────────────────────
 HUE_BRIDGE_IP = os.getenv("HUE_BRIDGE_IP", "")
