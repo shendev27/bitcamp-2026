@@ -10,7 +10,7 @@ from deepface import DeepFace
 
 from config import (
     WEBCAM_INDEX, FRAME_WIDTH, FRAME_HEIGHT, CAPTURE_FPS,
-    YOLO_MODEL, YOLO_IMGSZ, YOLO_CONF, MAX_FACES, EMOTION_EVERY_N,
+    YOLO_MODEL, YOLO_IMGSZ, YOLO_CONF, YOLO_EVERY_N, MAX_FACES, EMOTION_EVERY_N,
 )
 
 _EMOTION_KEYS = ["angry", "disgust", "fear", "happy", "sad", "surprise", "neutral"]
@@ -31,6 +31,10 @@ class VisionProcessor:
         self._latest_boxes: list[tuple] = []           # (x1,y1,x2,y2,conf)
         self._latest_emotions: list[dict] = []         # per-face emotion dicts
         self._latest_motion: float = 0.0
+        self._last_boxes: list[tuple] = []
+        self._last_top_boxes: list[tuple] = []
+        self._last_emotions: list[dict] = []
+        self._frame_idx = 0
 
         self._prev_gray: np.ndarray | None = None
         self._emotion_counters: dict[int, int] = {}
@@ -90,20 +94,30 @@ class VisionProcessor:
                 continue
 
             frame = cv2.resize(frame, (FRAME_WIDTH, FRAME_HEIGHT))
+            self._frame_idx += 1
+            run_yolo = (self._frame_idx % max(1, YOLO_EVERY_N)) == 0
 
-            # YOLO — person detection
-            results = self._model(frame, imgsz=YOLO_IMGSZ, conf=YOLO_CONF,
-                                  classes=[0], verbose=False)
-            boxes = []
-            if results and results[0].boxes is not None:
-                for box in results[0].boxes:
-                    x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
-                    conf = float(box.conf[0])
-                    boxes.append((x1, y1, x2, y2, conf))
+            # YOLO — person detection (skip frames for FPS)
+            if run_yolo:
+                results = self._model(frame, imgsz=YOLO_IMGSZ, conf=YOLO_CONF,
+                                      classes=[0], verbose=False)
+                boxes = []
+                if results and results[0].boxes is not None:
+                    for box in results[0].boxes:
+                        x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+                        conf = float(box.conf[0])
+                        boxes.append((x1, y1, x2, y2, conf))
+                self._last_boxes = boxes
+            else:
+                boxes = self._last_boxes
 
             # Sort by area, take top MAX_FACES
             sorted_boxes = sorted(boxes, key=lambda b: (b[2]-b[0])*(b[3]-b[1]), reverse=True)
             top_boxes = sorted_boxes[:MAX_FACES]
+            if run_yolo:
+                self._last_top_boxes = top_boxes
+            else:
+                top_boxes = self._last_top_boxes
 
             # Motion score
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -113,8 +127,12 @@ class VisionProcessor:
                 motion = float(np.mean(diff) / 255.0)
             self._prev_gray = gray
 
-            # DeepFace emotion — cached per slot
-            emotions = self._run_emotions(frame, top_boxes)
+            # DeepFace emotion — cached per slot; run less often
+            if run_yolo:
+                emotions = self._run_emotions(frame, top_boxes)
+                self._last_emotions = emotions
+            else:
+                emotions = self._last_emotions
 
             # Draw annotations
             annotated = self._draw(frame, top_boxes, emotions)
