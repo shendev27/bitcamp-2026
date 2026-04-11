@@ -16,7 +16,7 @@ from dj_brain import DJBrain
 from lights import make_controller, lerp_hex
 from spotify_ctrl import SpotifyController
 
-app = FastAPI(title="AI DJ")
+app = FastAPI(title="PASS THE AUX")
 
 app.add_middleware(
     CORSMiddleware,

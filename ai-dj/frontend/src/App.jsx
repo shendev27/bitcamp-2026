@@ -24,7 +24,7 @@ export default function App() {
           className="text-xl font-extrabold tracking-tight"
           style={{ color: theme.accent, textShadow: `0 0 20px ${theme.glow}` }}
         >
-          AI DJ
+          PASS THE AUX
         </h1>
         <span className="text-xs text-white/30 font-mono">
           {state ? `${state.ts ? new Date(state.ts * 1000).toLocaleTimeString() : ''}` : 'waiting…'}

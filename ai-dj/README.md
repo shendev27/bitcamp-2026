@@ -1,4 +1,4 @@
-# AI DJ — Real-time Crowd-Reactive DJ System
+# PASS THE AUX — Real-time Crowd-Reactive DJ System
 
 Webcam → YOLO person detection → DeepFace emotions → hype score → auto Spotify playlist switch + Hue lights + live dashboard.
 
