@@ -26,6 +26,7 @@ class DJBrain:
         people_count: int,
         emotions: list[dict],
         motion: float,
+        loudness: float,
     ) -> dict:
         """
         Process latest CV data and return the full state dict.
@@ -36,8 +37,8 @@ class DJBrain:
         emotions     : list of per-face emotion dicts (from emotion.py)
         motion       : normalised motion score 0–1
         """
-        hype = self._calc_hype(people_count, emotions, motion)
-        new_mood = self._update_mood(hype)
+        hype = self._calc_hype(people_count, emotions, motion, loudness)
+        new_mood, mood_check_s = self._update_mood(hype)
         dom_emotion = dominant_emotion(emotions)
         breakdown = emotion_breakdown(emotions)
 
@@ -46,8 +47,10 @@ class DJBrain:
             "dominant_emotion": dom_emotion,
             "emotion_breakdown": breakdown,
             "motion": round(motion, 3),
+            "loudness": round(loudness, 3),
             "hype": round(hype, 1),
             "mood": new_mood,
+            "mood_check_s": round(mood_check_s, 1),
             "action_reason": self._last_action_reason,
             "commentary": self._last_commentary,
         }
@@ -62,19 +65,33 @@ class DJBrain:
 
     # ── internals ──────────────────────────────────────────────────────────────
 
-    def _calc_hype(self, people_count: int, emotions: list[dict], motion: float) -> float:
+    def _calc_hype(self, people_count: int, emotions: list[dict], motion: float, loudness: float) -> float:
+        if people_count <= 0:
+            if not hasattr(self, "_no_people_hype"):
+                self._no_people_hype = 6.0
+            drift = random.uniform(-0.6, 0.6)
+            self._no_people_hype = max(3.0, min(10.0, self._no_people_hype + drift))
+            return self._no_people_hype
+
         avg_happy = 0.0
-        avg_sad = 0.0
         if emotions:
             avg_happy = sum(
                 e.get("happy", 0) + e.get("surprise", 0) for e in emotions
             ) / len(emotions)
-            avg_sad = sum(
-                e.get("sad", 0) + e.get("angry", 0) + e.get("fear", 0) for e in emotions
-            ) / len(emotions)
 
-        people_factor = min(people_count / PEOPLE_NORM, 1.0)
-        hype = 100 * (0.45 * motion + 0.35 * avg_happy + 0.20 * people_factor) - 25 * avg_sad
+        # Motion: scaled so fast movement (~crossing frame in ~2s) saturates.
+        motion_scaled = min(1.0, motion * 3.5)
+        # Loudness: boost sensitivity.
+        loudness_scaled = min(1.0, loudness * 2.0)
+        # People: max at 4 people.
+        people_factor = min(people_count / 4.0, 1.0)
+
+        hype = 100 * (
+            0.65 * motion_scaled
+            + 0.25 * loudness_scaled
+            + 0.05 * avg_happy
+            + 0.05 * people_factor
+        )
         return max(0.0, min(100.0, hype))
 
     def _band_for_hype(self, hype: float) -> str:
@@ -83,26 +100,46 @@ class DJBrain:
                 return name
         return "peak"
 
-    def _update_mood(self, hype: float) -> str:
+    def _update_mood(self, hype: float) -> tuple[str, float]:
+        now = time.time()
         target = self._band_for_hype(hype)
 
-        if target == self._mood:
-            self._candidate_mood = target
-            self._candidate_since = time.time()
-            return self._mood
+        if not hasattr(self, "_next_check_at"):
+            self._next_check_at = now + 10.0
+        if not hasattr(self, "_jump_candidate"):
+            self._jump_candidate = None
+            self._jump_since = 0.0
 
-        if target != self._candidate_mood:
-            self._candidate_mood = target
-            self._candidate_since = time.time()
-
-        if time.time() - self._candidate_since >= HYSTERESIS_SEC:
-            if self._candidate_mood != self._mood:
+        # Jump override: 3-level jump sustained for 1.5s.
+        if abs(self._band_index(target) - self._band_index(self._mood)) >= 3:
+            if self._jump_candidate != target:
+                self._jump_candidate = target
+                self._jump_since = now
+            elif now - self._jump_since >= 1.5:
                 old = self._mood
-                self._mood = self._candidate_mood
+                self._mood = target
                 self._last_action_reason = self._build_reason(old, self._mood, hype)
                 self._last_commentary = random.choice(COMMENTARY[self._mood])
+                self._next_check_at = now + 10.0
+                self._jump_candidate = None
+        else:
+            self._jump_candidate = None
 
-        return self._mood
+        # Regular 10s mood check cadence.
+        if now >= self._next_check_at:
+            if target != self._mood:
+                old = self._mood
+                self._mood = target
+                self._last_action_reason = self._build_reason(old, self._mood, hype)
+                self._last_commentary = random.choice(COMMENTARY[self._mood])
+            self._next_check_at = now + 10.0
+
+        mood_check_s = max(0.0, self._next_check_at - now)
+        return self._mood, mood_check_s
+
+    def _band_index(self, mood: str) -> int:
+        order = ["dead", "chill", "neutral", "hype", "peak"]
+        return order.index(mood) if mood in order else 0
 
     def _build_reason(self, old: str, new: str, hype: float) -> str:
         arrows = {"dead": 0, "chill": 1, "neutral": 2, "hype": 3, "peak": 4}

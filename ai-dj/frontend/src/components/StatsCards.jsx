@@ -20,6 +20,7 @@ function Card({ label, value, accent }) {
 export default function StatsCards({ state }) {
   const mood = state?.mood ?? 'dead'
   const theme = getMoodTheme(mood)
+  const moodCheck = state?.mood_check_s ?? 0
 
   return (
     <div className="grid grid-cols-2 gap-3">
@@ -35,6 +36,13 @@ export default function StatsCards({ state }) {
         value={theme.label}
         accent={theme.glow}
       />
+      <div className="col-span-2">
+        <Card
+          label="Mood Check"
+          value={`${Math.max(0, Math.ceil(moodCheck))}s`}
+          accent={theme.accent}
+        />
+      </div>
     </div>
   )
 }

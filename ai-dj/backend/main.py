@@ -3,6 +3,7 @@
 import asyncio
 import random
 import time
+import threading
 from contextlib import asynccontextmanager
 import cv2
 import numpy as np
@@ -12,6 +13,7 @@ from fastapi.responses import StreamingResponse
 
 from config import BROADCAST_HZ, ACTION_MAP, COMMENTARY
 from vision import VisionProcessor
+from audio_meter import AudioMeter
 from dj_brain import DJBrain
 from lights import make_controller, lerp_hex
 from spotify_ctrl import SpotifyController
@@ -20,6 +22,7 @@ vision = VisionProcessor()
 brain = DJBrain()
 lights = make_controller()
 spotify = SpotifyController()
+audio_meter = AudioMeter()
 
 _latest_state: dict = {}
 _current_hex: str = ACTION_MAP["dead"][1]
@@ -30,12 +33,21 @@ _manual_commentary: str = ""
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    vision.start()
+    def _start_vision():
+        try:
+            vision.start()
+            print("[STARTUP] Vision thread started.")
+        except Exception as exc:
+            print(f"[STARTUP] Vision start failed: {exc}")
+
+    threading.Thread(target=_start_vision, daemon=True).start()
+    threading.Thread(target=audio_meter.start, daemon=True).start()
     loop = asyncio.get_event_loop()
     loop.run_in_executor(None, spotify.connect)
     asyncio.create_task(_brain_loop())
     yield
     vision.stop()
+    audio_meter.stop()
 
 
 app = FastAPI(title="PASS THE AUX", lifespan=lifespan)
@@ -75,7 +87,8 @@ async def _brain_loop():
         t0 = time.time()
 
         boxes, emotions, motion = vision.get_state()
-        state = brain.update(len(boxes), emotions, motion)
+        loudness = audio_meter.get_level()
+        state = brain.update(len(boxes), emotions, motion, loudness)
         mood = state["mood"]
         now = time.time()
         if _manual_mood and now < _manual_until:
