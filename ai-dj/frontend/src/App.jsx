@@ -31,7 +31,6 @@ function Starfield() {
           transition={{ duration: s.duration, delay: s.delay, repeat: Infinity, ease: 'easeInOut' }}
         />
       ))}
-      {/* Nebula glows */}
       <div style={{
         position: 'absolute', top: '15%', left: '10%',
         width: 500, height: 500, borderRadius: '50%',
@@ -81,35 +80,39 @@ export default function App() {
           </h1>
         </div>
 
-        {/* 3-column: spectrum | video | side panels */}
-        <div className="max-w-7xl mx-auto flex gap-4 items-start">
-          {/* Left: Audio Spectrum */}
-          <div className="w-36 flex-shrink-0">
+        {/* video | side panels */}
+        <div className="max-w-5xl mx-auto flex gap-4 items-start">
+          {/* Left: Audio Spectrum column */}
+          <div className="w-28 flex-shrink-0 self-stretch">
             <AudioSpectrum mood={mood} hype={state?.hype ?? 0} />
           </div>
 
-          {/* Center: Video with floating characters */}
+          {/* Center: Video */}
           <div className="flex-1" style={{ zIndex: 1 }}>
             <VideoPanel mood={mood} connected={connected} />
           </div>
 
-          {/* Right: People + Mood */}
-          <div className="w-44 flex-shrink-0 flex flex-col gap-2">
+          {/* Right: People + Mood — shifted down, wider gap */}
+          <div className="w-44 flex-shrink-0 flex flex-col gap-5" style={{ paddingTop: '48px' }}>
             <PeopleCard count={state?.people_count ?? 0} mood={mood} />
             <EmotionCard mood={mood} />
           </div>
         </div>
 
-        {/* Bottom: Music player + Hype */}
-        <div className="max-w-7xl mx-auto mt-3 flex flex-col gap-2">
+        {/* Music player — centered, narrow */}
+        <div className="max-w-lg mx-auto mt-6">
           <MusicPlayer state={state} mood={mood} />
+        </div>
+
+        {/* Hype bar */}
+        <div className="max-w-lg mx-auto mt-4">
           <HypeBar hype={state?.hype ?? 0} mood={mood} />
         </div>
 
         {/* Test mood buttons */}
-        <div className="max-w-7xl mx-auto mt-2 rounded-xl border border-white/10 bg-white/5 backdrop-blur px-3 py-2">
+        <div className="max-w-lg mx-auto mt-4 rounded-xl border border-white/10 bg-white/5 backdrop-blur px-4 py-3">
           <span className="text-xs font-semibold uppercase tracking-widest text-white/40">Test Switch</span>
-          <div className="mt-1 flex flex-wrap gap-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             {['dead', 'chill', 'neutral', 'hype', 'peak'].map((m) => (
               <button
                 key={m}

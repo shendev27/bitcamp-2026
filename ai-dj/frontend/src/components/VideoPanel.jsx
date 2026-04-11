@@ -54,7 +54,7 @@ export default function VideoPanel({ mood = 'dead', connected = false }) {
               src={`http://${host}:8000/video_feed`}
               alt=""
               className="w-full object-cover"
-              style={{ display: 'block', minHeight: '260px', maxHeight: '42vh' }}
+              style={{ display: 'block', minHeight: '400px', maxHeight: '60vh' }}
             />
             {/* Mood label */}
             <div

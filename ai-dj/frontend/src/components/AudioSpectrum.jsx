@@ -1,62 +1,107 @@
-import { useMemo } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { getMoodTheme } from '../theme'
 
-const BAR_COUNT = 18
+const SEGMENTS = 24
 
-export default function AudioSpectrum({ mood, hype }) {
-  const theme = getMoodTheme(mood)
+function segmentColor(i) {
+  if (i < 14) return '#22c55e'
+  if (i < 19) return '#eab308'
+  return '#ef4444'
+}
 
-  const bars = useMemo(() =>
-    Array.from({ length: BAR_COUNT }, (_, i) => {
-      // Shape: tall in center, shorter at edges — like a real spectrum
-      const center = (BAR_COUNT - 1) / 2
-      const distFromCenter = Math.abs(i - center) / center
-      const baseMax = 70 - distFromCenter * 40 + Math.sin(i * 1.3) * 15
-      return {
-        id: i,
-        maxPct: Math.max(15, baseMax),
-        duration: 0.5 + Math.random() * 0.9,
-        delay: (i / BAR_COUNT) * 0.5,
+export default function AudioSpectrum({ hype }) {
+  const [level, setLevel] = useState(0)
+  const [micActive, setMicActive] = useState(false)
+  const rafRef = useRef(null)
+  const analyserRef = useRef(null)
+  const streamRef = useRef(null)
+
+  useEffect(() => {
+    let ctx
+
+    async function startMic() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+        streamRef.current = stream
+        ctx = new AudioContext()
+        const source = ctx.createMediaStreamSource(stream)
+        const analyser = ctx.createAnalyser()
+        analyser.fftSize = 256
+        analyser.smoothingTimeConstant = 0.75
+        source.connect(analyser)
+        analyserRef.current = analyser
+        setMicActive(true)
+
+        const data = new Uint8Array(analyser.frequencyBinCount)
+
+        function tick() {
+          analyser.getByteFrequencyData(data)
+          // Average of all frequency bins → 0–255 → 0–100
+          const avg = data.reduce((a, b) => a + b, 0) / data.length
+          setLevel((avg / 255) * 100)
+          rafRef.current = requestAnimationFrame(tick)
+        }
+        tick()
+      } catch {
+        setMicActive(false)
       }
-    }), [])
+    }
 
-  const intensity = Math.max(0.2, hype / 100)
+    startMic()
+
+    return () => {
+      cancelAnimationFrame(rafRef.current)
+      streamRef.current?.getTracks().forEach(t => t.stop())
+      ctx?.close()
+    }
+  }, [])
+
+  // Fall back to hype-based jitter when mic is unavailable
+  useEffect(() => {
+    if (micActive) return
+    const id = setInterval(() => {
+      const jitter = (Math.random() - 0.4) * 28
+      setLevel(Math.max(0, Math.min(100, hype + jitter)))
+    }, 120)
+    return () => clearInterval(id)
+  }, [micActive, hype])
+
+  const activeCount = Math.round((level / 100) * SEGMENTS)
 
   return (
     <div
-      className="rounded-xl border border-white/10 bg-white/5 backdrop-blur p-4 flex flex-col"
-      style={{ minHeight: '200px' }}
+      className="rounded-xl border border-white/10 bg-white/5 backdrop-blur h-full flex flex-col items-center"
+      style={{ padding: '10px 8px' }}
     >
-      <span className="text-xs font-semibold uppercase tracking-widest text-white/40 mb-3">
-        Audio Spectrum
+      <span className="text-[9px] font-semibold uppercase tracking-widest text-white/30 mb-2">
+        {micActive ? 'MIC' : 'VOL'}
       </span>
-      <div className="flex-1 flex items-end justify-between gap-1">
-        {bars.map(bar => (
-          <motion.div
-            key={bar.id}
-            className="flex-1 rounded-t-sm"
-            style={{
-              background: `linear-gradient(to top, ${theme.accent}, ${theme.glow}88)`,
-              minWidth: 4,
-              opacity: 0.85,
-            }}
-            animate={{
-              height: [
-                `${6 * intensity}%`,
-                `${bar.maxPct * intensity}%`,
-                `${10 * intensity}%`,
-                `${bar.maxPct * 0.55 * intensity}%`,
-                `${6 * intensity}%`,
-              ],
-            }}
-            transition={{
-              duration: bar.duration,
-              delay: bar.delay,
-              repeat: Infinity,
-              ease: 'easeInOut',
-            }}
-          />
+
+      <div className="flex-1 flex flex-col-reverse justify-start gap-[3px] w-full">
+        {Array.from({ length: SEGMENTS }, (_, i) => {
+          const active = i < activeCount
+          const color = segmentColor(i)
+          return (
+            <motion.div
+              key={i}
+              className="w-full rounded-sm"
+              style={{ height: 8, flexShrink: 0 }}
+              animate={{
+                background: active ? color : 'rgba(255,255,255,0.06)',
+                boxShadow: active ? `0 0 6px ${color}99` : 'none',
+                opacity: active ? 1 : 0.4,
+              }}
+              transition={{ duration: 0.05 }}
+            />
+          )
+        })}
+      </div>
+
+      <div className="flex flex-col-reverse justify-between w-full mt-1" style={{ height: 36 }}>
+        {['0', '50', '100'].map(label => (
+          <span key={label} className="text-[8px] text-white/25 text-center leading-none">
+            {label}
+          </span>
         ))}
       </div>
     </div>
