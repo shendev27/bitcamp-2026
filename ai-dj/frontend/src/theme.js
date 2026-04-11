@@ -4,7 +4,7 @@ export const MOOD_THEME = {
     glow: '#1a1a40',
     accent: '#6666aa',
     gradient: 'from-[#0a0a0f] via-[#0d0d1a] to-[#0a0a0f]',
-    label: 'DEAD',
+    label: 'SUPER CHILL',
     barColor: '#6666aa',
   },
   chill: {

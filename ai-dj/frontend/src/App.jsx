@@ -1,10 +1,58 @@
-import { motion, AnimatePresence } from 'framer-motion'
+import { useMemo } from 'react'
+import { motion } from 'framer-motion'
 import { useWS } from './hooks/useWS'
 import { getMoodTheme } from './theme'
 import VideoPanel from './components/VideoPanel'
-import StatsCards from './components/StatsCards'
-import DJPanel from './components/DJPanel'
+import AudioSpectrum from './components/AudioSpectrum'
+import MusicPlayer from './components/MusicPlayer'
 import HypeBar from './components/HypeBar'
+import PeopleCard from './components/PeopleCard'
+import EmotionCard from './components/EmotionCard'
+
+function Starfield() {
+  const stars = useMemo(() =>
+    Array.from({ length: 200 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      size: Math.random() * 2 + 0.5,
+      delay: Math.random() * 5,
+      duration: Math.random() * 3 + 2,
+    })), [])
+
+  return (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0 }}>
+      {stars.map(s => (
+        <motion.div
+          key={s.id}
+          className="absolute rounded-full bg-white"
+          style={{ left: `${s.x}%`, top: `${s.y}%`, width: s.size, height: s.size }}
+          animate={{ opacity: [0.1, 0.9, 0.1] }}
+          transition={{ duration: s.duration, delay: s.delay, repeat: Infinity, ease: 'easeInOut' }}
+        />
+      ))}
+      {/* Nebula glows */}
+      <div style={{
+        position: 'absolute', top: '15%', left: '10%',
+        width: 500, height: 500, borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(90,40,220,0.18) 0%, transparent 70%)',
+        filter: 'blur(70px)',
+      }} />
+      <div style={{
+        position: 'absolute', bottom: '20%', right: '8%',
+        width: 400, height: 400, borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(220,40,100,0.14) 0%, transparent 70%)',
+        filter: 'blur(60px)',
+      }} />
+      <div style={{
+        position: 'absolute', top: '55%', left: '38%',
+        width: 350, height: 350, borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(30,120,255,0.12) 0%, transparent 70%)',
+        filter: 'blur(50px)',
+      }} />
+    </div>
+  )
+}
 
 export default function App() {
   const { state, connected } = useWS()
@@ -19,57 +67,62 @@ export default function App() {
   }
 
   return (
-    <motion.div
-      className={`min-h-screen bg-gradient-to-br ${theme.gradient} p-4`}
-      animate={{ background: undefined }}
-      transition={{ duration: 0.3, ease: 'easeInOut' }}
-      style={{ fontFamily: 'Inter, sans-serif' }}
-    >
-      {/* Header */}
-      <div className="max-w-7xl mx-auto mb-4 flex items-center justify-between">
-        <h1
-          className="text-xl font-extrabold tracking-tight"
-          style={{ color: theme.accent, textShadow: `0 0 20px ${theme.glow}` }}
-        >
-          PASS THE AUX
-        </h1>
-        <span className="text-xs text-white/30 font-mono">
-          {state ? `${state.ts ? new Date(state.ts * 1000).toLocaleTimeString() : ''}` : 'waiting…'}
-        </span>
-      </div>
+    <div className="min-h-screen relative" style={{ background: '#050510', fontFamily: 'Inter, sans-serif' }}>
+      <Starfield />
 
-      {/* Main layout */}
-      <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-4">
-        {/* Left 60%: video */}
-        <div className="lg:w-[60%]">
-          <VideoPanel mood={mood} connected={connected} />
+      <div className="relative px-4 pt-3 pb-2" style={{ zIndex: 1 }}>
+        {/* Header */}
+        <div className="text-center mb-2">
+          <h1
+            className="text-xl font-extrabold tracking-widest"
+            style={{ color: theme.accent, textShadow: `0 0 30px ${theme.glow}` }}
+          >
+            PASS THE AUX
+          </h1>
         </div>
 
-        {/* Right 40%: panels */}
-        <div className="lg:w-[40%] flex flex-col gap-3">
-          <StatsCards state={state} />
+        {/* 3-column: spectrum | video | side panels */}
+        <div className="max-w-7xl mx-auto flex gap-4 items-start">
+          {/* Left: Audio Spectrum */}
+          <div className="w-36 flex-shrink-0">
+            <AudioSpectrum mood={mood} hype={state?.hype ?? 0} />
+          </div>
+
+          {/* Center: Video with floating characters */}
+          <div className="flex-1" style={{ zIndex: 1 }}>
+            <VideoPanel mood={mood} connected={connected} />
+          </div>
+
+          {/* Right: People + Mood */}
+          <div className="w-44 flex-shrink-0 flex flex-col gap-2">
+            <PeopleCard count={state?.people_count ?? 0} mood={mood} />
+            <EmotionCard mood={mood} />
+          </div>
+        </div>
+
+        {/* Bottom: Music player + Hype */}
+        <div className="max-w-7xl mx-auto mt-3 flex flex-col gap-2">
+          <MusicPlayer state={state} mood={mood} />
           <HypeBar hype={state?.hype ?? 0} mood={mood} />
-          <DJPanel state={state} />
-          <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur p-4">
-            <span className="text-xs font-semibold uppercase tracking-widest text-white/40">Test Switch</span>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {['dead', 'chill', 'neutral', 'hype', 'peak'].map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setMood(m)}
-                  className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border border-white/10"
-                  style={{
-                    color: theme.accent,
-                    background: `${theme.glow}22`,
-                  }}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
+        </div>
+
+        {/* Test mood buttons */}
+        <div className="max-w-7xl mx-auto mt-2 rounded-xl border border-white/10 bg-white/5 backdrop-blur px-3 py-2">
+          <span className="text-xs font-semibold uppercase tracking-widest text-white/40">Test Switch</span>
+          <div className="mt-1 flex flex-wrap gap-2">
+            {['dead', 'chill', 'neutral', 'hype', 'peak'].map((m) => (
+              <button
+                key={m}
+                onClick={() => setMood(m)}
+                className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border border-white/10"
+                style={{ color: theme.accent, background: `${theme.glow}22` }}
+              >
+                {m}
+              </button>
+            ))}
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   )
 }
