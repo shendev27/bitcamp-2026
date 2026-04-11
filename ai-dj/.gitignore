@@ -1,0 +1,24 @@
+# Environment & secrets
+.env
+*.env
+.cache
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# YOLO / ML model weights
+*.pt
+*.pth
+*.onnx
+~/.deepface/
+
+# Node
+node_modules/
+dist/
+
+# Misc
+.DS_Store
+*.log
