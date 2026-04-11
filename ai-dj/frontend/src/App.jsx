@@ -80,11 +80,11 @@ export default function App() {
           </h1>
         </div>
 
-        {/* video | side panels */}
-        <div className="max-w-5xl mx-auto flex gap-4 items-start">
-          {/* Left: Audio Spectrum column */}
-          <div className="w-28 flex-shrink-0 self-stretch">
-            <AudioSpectrum mood={mood} hype={state?.hype ?? 0} />
+        {/* 3-column — equal side widths so video is perfectly centered */}
+        <div className="max-w-5xl mx-auto flex gap-5 items-stretch">
+          {/* Left: Audio Spectrum — same width as right so video centers */}
+          <div className="w-44 flex-shrink-0">
+            <AudioSpectrum hype={state?.hype ?? 0} />
           </div>
 
           {/* Center: Video */}
@@ -92,37 +92,31 @@ export default function App() {
             <VideoPanel mood={mood} connected={connected} />
           </div>
 
-          {/* Right: People + Mood — shifted down, wider gap */}
-          <div className="w-44 flex-shrink-0 flex flex-col gap-5" style={{ paddingTop: '48px' }}>
+          {/* Right: People + Mood */}
+          <div className="w-44 flex-shrink-0 flex flex-col gap-4" style={{ paddingTop: 44 }}>
             <PeopleCard count={state?.people_count ?? 0} mood={mood} />
             <EmotionCard mood={mood} />
           </div>
         </div>
 
-        {/* Music player — centered, narrow */}
-        <div className="max-w-lg mx-auto mt-6">
+        {/* Bottom — aligned under the centered video */}
+        <div className="max-w-lg mx-auto mt-6 flex flex-col gap-4">
           <MusicPlayer state={state} mood={mood} />
-        </div>
-
-        {/* Hype bar */}
-        <div className="max-w-lg mx-auto mt-4">
           <HypeBar hype={state?.hype ?? 0} mood={mood} />
-        </div>
-
-        {/* Test mood buttons */}
-        <div className="max-w-lg mx-auto mt-4 rounded-xl border border-white/10 bg-white/5 backdrop-blur px-4 py-3">
-          <span className="text-xs font-semibold uppercase tracking-widest text-white/40">Test Switch</span>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {['dead', 'chill', 'neutral', 'hype', 'peak'].map((m) => (
-              <button
-                key={m}
-                onClick={() => setMood(m)}
-                className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border border-white/10"
-                style={{ color: theme.accent, background: `${theme.glow}22` }}
-              >
-                {m}
-              </button>
-            ))}
+          <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur px-4 py-3">
+            <span className="text-xs font-semibold uppercase tracking-widest text-white/40">Test Switch</span>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {['dead', 'chill', 'neutral', 'hype', 'peak'].map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setMood(m)}
+                  className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border border-white/10"
+                  style={{ color: theme.accent, background: `${theme.glow}22` }}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>

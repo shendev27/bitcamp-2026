@@ -2,18 +2,18 @@ import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 
 const SEGMENTS = 24
+const GAIN = 8  // multiply raw signal so normal speech reaches mid-meter
 
-function segmentColor(i) {
-  if (i < 14) return '#22c55e'
-  if (i < 19) return '#eab308'
-  return '#ef4444'
+// Smooth green → yellow → red gradient using HSL
+function segmentColor(i, total) {
+  const hue = Math.round(120 - (i / (total - 1)) * 120)  // 120 = green, 0 = red
+  return `hsl(${hue}, 100%, 45%)`
 }
 
-export default function AudioSpectrum({ hype }) {
+export default function AudioSpectrum({ hype = 0 }) {
   const [level, setLevel] = useState(0)
   const [micActive, setMicActive] = useState(false)
   const rafRef = useRef(null)
-  const analyserRef = useRef(null)
   const streamRef = useRef(null)
 
   useEffect(() => {
@@ -26,19 +26,19 @@ export default function AudioSpectrum({ hype }) {
         ctx = new AudioContext()
         const source = ctx.createMediaStreamSource(stream)
         const analyser = ctx.createAnalyser()
-        analyser.fftSize = 256
-        analyser.smoothingTimeConstant = 0.75
+        analyser.fftSize = 512
+        analyser.smoothingTimeConstant = 0.55  // faster decay = more responsive
         source.connect(analyser)
-        analyserRef.current = analyser
         setMicActive(true)
 
         const data = new Uint8Array(analyser.frequencyBinCount)
 
         function tick() {
           analyser.getByteFrequencyData(data)
-          // Average of all frequency bins → 0–255 → 0–100
-          const avg = data.reduce((a, b) => a + b, 0) / data.length
-          setLevel((avg / 255) * 100)
+          // Use RMS of frequency bins for a more natural loudness reading
+          const rms = Math.sqrt(data.reduce((sum, v) => sum + v * v, 0) / data.length)
+          const boosted = Math.min(100, (rms / 255) * 100 * GAIN)
+          setLevel(boosted)
           rafRef.current = requestAnimationFrame(tick)
         }
         tick()
@@ -56,7 +56,7 @@ export default function AudioSpectrum({ hype }) {
     }
   }, [])
 
-  // Fall back to hype-based jitter when mic is unavailable
+  // Fallback: hype-based jitter when mic is unavailable
   useEffect(() => {
     if (micActive) return
     const id = setInterval(() => {
@@ -80,18 +80,19 @@ export default function AudioSpectrum({ hype }) {
       <div className="flex-1 flex flex-col-reverse justify-start gap-[3px] w-full">
         {Array.from({ length: SEGMENTS }, (_, i) => {
           const active = i < activeCount
-          const color = segmentColor(i)
+          const color = segmentColor(i, SEGMENTS)
           return (
-            <motion.div
+            <div
               key={i}
               className="w-full rounded-sm"
-              style={{ height: 8, flexShrink: 0 }}
-              animate={{
+              style={{
+                height: 8,
+                flexShrink: 0,
                 background: active ? color : 'rgba(255,255,255,0.06)',
-                boxShadow: active ? `0 0 6px ${color}99` : 'none',
-                opacity: active ? 1 : 0.4,
+                boxShadow: active ? `0 0 7px ${color}bb` : 'none',
+                opacity: active ? 1 : 0.35,
+                transition: 'background 0.05s, box-shadow 0.05s, opacity 0.05s',
               }}
-              transition={{ duration: 0.05 }}
             />
           )
         })}
