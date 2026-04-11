@@ -1,8 +1,8 @@
 """FastAPI app: /video_feed MJPEG + /ws JSON state at ~5 Hz."""
 
 import asyncio
-import io
 import time
+from contextlib import asynccontextmanager
 import cv2
 import numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -15,15 +15,6 @@ from emotion import EmotionCache
 from dj_brain import DJBrain
 from lights import make_controller, lerp_hex
 from spotify_ctrl import SpotifyController
-
-app = FastAPI(title="PASS THE AUX")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # ── Shared state ──────────────────────────────────────────────────────────────
 vision = VisionProcessor()
@@ -38,16 +29,23 @@ _current_hex: str = ACTION_MAP["dead"][1]
 
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
-@app.on_event("startup")
-async def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     vision.start()
     spotify.connect()
     asyncio.create_task(_brain_loop())
-
-
-@app.on_event("shutdown")
-async def shutdown():
+    yield
     vision.stop()
+
+
+app = FastAPI(title="PASS THE AUX", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ── Core loop (runs as background task) ───────────────────────────────────────
