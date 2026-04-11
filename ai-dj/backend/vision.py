@@ -2,6 +2,7 @@
 
 import threading
 import time
+import os
 import cv2
 import numpy as np
 from ultralytics import YOLO
@@ -42,10 +43,17 @@ class VisionProcessor:
 
     def start(self):
         """Open camera and start the background processing thread."""
-        self._cap = cv2.VideoCapture(WEBCAM_INDEX)
+        if os.name == "nt":
+            self._cap = cv2.VideoCapture(WEBCAM_INDEX, cv2.CAP_DSHOW)
+        else:
+            self._cap = cv2.VideoCapture(WEBCAM_INDEX)
+        if not self._cap or not self._cap.isOpened():
+            print(f"[VISION] Failed to open camera index {WEBCAM_INDEX}.")
         self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
         self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
         self._cap.set(cv2.CAP_PROP_FPS, CAPTURE_FPS)
+        if os.name == "nt":
+            self._cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
         self._running = True
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
