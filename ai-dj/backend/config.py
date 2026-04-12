@@ -11,6 +11,7 @@ AUDIO_GAIN = float(os.getenv("AUDIO_GAIN", "8.0"))
 
 # ── Webcam ────────────────────────────────────────────────────────────────────
 WEBCAM_INDEX = int(os.getenv("WEBCAM_INDEX", 0))
+WEBCAM_FLIP = int(os.getenv("WEBCAM_FLIP", 1))  # 1 = mirror horizontally
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
 CAPTURE_FPS = 25

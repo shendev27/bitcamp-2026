@@ -9,7 +9,7 @@ from ultralytics import YOLO
 from deepface import DeepFace
 
 from config import (
-    WEBCAM_INDEX, FRAME_WIDTH, FRAME_HEIGHT, CAPTURE_FPS,
+    WEBCAM_INDEX, WEBCAM_FLIP, FRAME_WIDTH, FRAME_HEIGHT, CAPTURE_FPS,
     YOLO_MODEL, YOLO_IMGSZ, YOLO_CONF, YOLO_EVERY_N, MAX_FACES, EMOTION_EVERY_N,
 )
 
@@ -108,6 +108,9 @@ class VisionProcessor:
             if not ok:
                 time.sleep(0.02)
                 continue
+
+            if WEBCAM_FLIP:
+                frame = cv2.flip(frame, 1)
 
             frame = cv2.resize(frame, (FRAME_WIDTH, FRAME_HEIGHT))
 
