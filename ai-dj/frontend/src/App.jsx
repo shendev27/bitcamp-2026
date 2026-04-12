@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { motion } from 'framer-motion'
+import vibecheckLogo from './vibecheck.png'
 import { useWS } from './hooks/useWS'
 import { getMoodTheme } from './theme'
 import VideoPanel from './components/VideoPanel'
@@ -70,14 +71,21 @@ export default function App() {
       <Starfield />
 
       <div className="relative px-4 pt-3 pb-2" style={{ zIndex: 1 }}>
-        {/* Header */}
+        {/* Header logo — masked so it takes the exact mood accent color */}
         <div className="text-center mb-2">
-          <h1
-            className="text-xl font-extrabold tracking-widest"
-            style={{ color: theme.accent, textShadow: `0 0 30px ${theme.glow}` }}
-          >
-            VIBE CHECK
-          </h1>
+          <div
+            style={{
+              display: 'inline-block',
+              height: 48,
+              width: 342,
+              transform: 'translateY(20px)',
+              background: theme.accent,
+              WebkitMask: `url(${vibecheckLogo}) no-repeat center / contain`,
+              mask: `url(${vibecheckLogo}) no-repeat center / contain`,
+              filter: `drop-shadow(0 0 14px ${theme.glow})`,
+              transition: 'background 0.5s ease, filter 0.5s ease',
+            }}
+          />
         </div>
 
         {/* 3-column — equal side widths so video is perfectly centered */}
