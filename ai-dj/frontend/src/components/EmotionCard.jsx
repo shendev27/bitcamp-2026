@@ -5,28 +5,28 @@ export default function EmotionCard({ mood }) {
   const theme = getMoodTheme(mood)
 
   return (
-    <div
-      className="rounded-xl border border-white/10 bg-white/5 backdrop-blur p-4 flex-1"
-      style={{ minHeight: '90px' }}
-    >
+    <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur p-4 flex flex-col justify-center items-center gap-2">
       <span className="text-xs font-semibold uppercase tracking-widest text-white/40">Mood</span>
       <AnimatePresence mode="wait">
-        <motion.div
+        <motion.span
           key={mood}
-          className="mt-3"
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
+          className="text-2xl font-black tracking-widest text-center"
+          style={{ color: theme.accent, textShadow: `0 0 20px ${theme.glow}` }}
+          initial={{ opacity: 0, scale: 0.85 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.85 }}
           transition={{ duration: 0.3 }}
         >
-          <span
-            className="text-xl font-bold tracking-widest"
-            style={{ color: theme.accent, textShadow: `0 0 16px ${theme.glow}` }}
-          >
-            {theme.label}
-          </span>
-        </motion.div>
+          {theme.label}
+        </motion.span>
       </AnimatePresence>
+      {/* Mood glow dot */}
+      <motion.div
+        className="rounded-full"
+        style={{ width: 8, height: 8, background: theme.accent, boxShadow: `0 0 12px ${theme.accent}` }}
+        animate={{ opacity: [0.4, 1, 0.4] }}
+        transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+      />
     </div>
   )
 }

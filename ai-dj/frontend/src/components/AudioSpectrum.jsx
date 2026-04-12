@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { motion } from 'framer-motion'
 
 const SEGMENTS = 24
-const GAIN = 8  // multiply raw signal so normal speech reaches mid-meter
+const GAIN = 8
 
-// Smooth green → yellow → red gradient using HSL
 function segmentColor(i, total) {
-  const hue = Math.round(120 - (i / (total - 1)) * 120)  // 120 = green, 0 = red
+  const hue = Math.round(120 - (i / (total - 1)) * 120)
   return `hsl(${hue}, 100%, 45%)`
 }
 
@@ -27,18 +25,15 @@ export default function AudioSpectrum({ hype = 0 }) {
         const source = ctx.createMediaStreamSource(stream)
         const analyser = ctx.createAnalyser()
         analyser.fftSize = 512
-        analyser.smoothingTimeConstant = 0.55  // faster decay = more responsive
+        analyser.smoothingTimeConstant = 0.55
         source.connect(analyser)
         setMicActive(true)
 
         const data = new Uint8Array(analyser.frequencyBinCount)
-
         function tick() {
           analyser.getByteFrequencyData(data)
-          // Use RMS of frequency bins for a more natural loudness reading
           const rms = Math.sqrt(data.reduce((sum, v) => sum + v * v, 0) / data.length)
-          const boosted = Math.min(100, (rms / 255) * 100 * GAIN)
-          setLevel(boosted)
+          setLevel(Math.min(100, (rms / 255) * 100 * GAIN))
           rafRef.current = requestAnimationFrame(tick)
         }
         tick()
@@ -48,7 +43,6 @@ export default function AudioSpectrum({ hype = 0 }) {
     }
 
     startMic()
-
     return () => {
       cancelAnimationFrame(rafRef.current)
       streamRef.current?.getTracks().forEach(t => t.stop())
@@ -56,7 +50,6 @@ export default function AudioSpectrum({ hype = 0 }) {
     }
   }, [])
 
-  // Fallback: hype-based jitter when mic is unavailable
   useEffect(() => {
     if (micActive) return
     const id = setInterval(() => {
@@ -70,40 +63,42 @@ export default function AudioSpectrum({ hype = 0 }) {
 
   return (
     <div
-      className="rounded-xl border border-white/10 bg-white/5 backdrop-blur h-full flex flex-col items-center"
-      style={{ padding: '10px 8px' }}
+      className="rounded-xl border border-white/10 bg-white/5 backdrop-blur h-full flex flex-col"
+      style={{ padding: '10px 10px 10px 6px' }}
     >
-      <span className="text-[9px] font-semibold uppercase tracking-widest text-white/30 mb-2">
+      {/* Label */}
+      <span className="text-[9px] font-semibold uppercase tracking-widest text-white/30 mb-2 text-center">
         {micActive ? 'MIC' : 'VOL'}
       </span>
 
-      <div className="flex-1 flex flex-col-reverse justify-start gap-[3px] w-full">
-        {Array.from({ length: SEGMENTS }, (_, i) => {
-          const active = i < activeCount
-          const color = segmentColor(i, SEGMENTS)
-          return (
-            <div
-              key={i}
-              className="w-full rounded-sm"
-              style={{
-                height: 8,
-                flexShrink: 0,
-                background: active ? color : 'rgba(255,255,255,0.06)',
-                boxShadow: active ? `0 0 7px ${color}bb` : 'none',
-                opacity: active ? 1 : 0.35,
-                transition: 'background 0.05s, box-shadow 0.05s, opacity 0.05s',
-              }}
-            />
-          )
-        })}
-      </div>
+      {/* Meter row: scale labels | bars */}
+      <div className="flex-1 flex flex-row gap-2 min-h-0">
+        {/* Scale labels — pinned top/middle/bottom alongside bars */}
+        <div className="flex flex-col justify-between py-0.5 flex-shrink-0">
+          <span className="text-[8px] text-white/30 leading-none">100</span>
+          <span className="text-[8px] text-white/30 leading-none">50</span>
+          <span className="text-[8px] text-white/30 leading-none">0</span>
+        </div>
 
-      <div className="flex flex-col-reverse justify-between w-full mt-1" style={{ height: 36 }}>
-        {['0', '50', '100'].map(label => (
-          <span key={label} className="text-[8px] text-white/25 text-center leading-none">
-            {label}
-          </span>
-        ))}
+        {/* Segments — fill full height */}
+        <div className="flex-1 flex flex-col-reverse gap-[2px] min-h-0">
+          {Array.from({ length: SEGMENTS }, (_, i) => {
+            const active = i < activeCount
+            const color = segmentColor(i, SEGMENTS)
+            return (
+              <div
+                key={i}
+                className="flex-1 rounded-sm w-full"
+                style={{
+                  background: active ? color : 'rgba(255,255,255,0.06)',
+                  boxShadow: active ? `0 0 7px ${color}bb` : 'none',
+                  opacity: active ? 1 : 0.35,
+                  transition: 'background 0.05s, box-shadow 0.05s, opacity 0.05s',
+                }}
+              />
+            )
+          })}
+        </div>
       </div>
     </div>
   )
