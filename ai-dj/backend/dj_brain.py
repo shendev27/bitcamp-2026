@@ -79,16 +79,16 @@ class DJBrain:
                 e.get("happy", 0) + e.get("surprise", 0) for e in emotions
             ) / len(emotions)
 
-        # Motion: scaled so fast movement (~crossing frame in ~2s) saturates.
-        motion_scaled = min(1.0, motion * 3.5)
-        # Loudness: boost sensitivity.
-        loudness_scaled = min(1.0, loudness * 2.0)
+        # Motion: scale up so less movement yields more hype.
+        motion_scaled = min(1.0, motion * 10.0)
+        # Loudness: 20% -> 0, 80% -> 1 (linear).
+        loudness_scaled = min(1.0, max(0.0, (loudness - 0.2) / 0.6))
         # People: max at 4 people.
         people_factor = min(people_count / 4.0, 1.0)
 
         hype = 100 * (
-            0.65 * motion_scaled
-            + 0.25 * loudness_scaled
+            0.60 * motion_scaled
+            + 0.30 * loudness_scaled
             + 0.05 * avg_happy
             + 0.05 * people_factor
         )

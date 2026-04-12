@@ -5,6 +5,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Audio
+AUDIO_GAIN = float(os.getenv("AUDIO_GAIN", "8.0"))
+
+
 # ── Webcam ────────────────────────────────────────────────────────────────────
 WEBCAM_INDEX = int(os.getenv("WEBCAM_INDEX", 0))
 FRAME_WIDTH = 640
