@@ -61,7 +61,7 @@ export default function App() {
 
   const setMood = async (next) => {
     try {
-      await fetch(`http://${host}:8000/debug/mood/${next}`, { method: 'POST' })
+      await fetch(`http://${host}:8000/debug/mood/${next}?seconds=10`, { method: 'POST' })
     } catch (_) {}
   }
 

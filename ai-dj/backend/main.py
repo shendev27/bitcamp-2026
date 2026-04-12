@@ -61,7 +61,7 @@ app.add_middleware(
 
 
 @app.post("/debug/mood/{mood}")
-async def debug_set_mood(mood: str, seconds: int = 60):
+async def debug_set_mood(mood: str, seconds: int = 10):
     """Temporary mood override for UI testing — also triggers a song change."""
     global _manual_mood, _manual_until, _manual_commentary
     if mood not in ACTION_MAP:
