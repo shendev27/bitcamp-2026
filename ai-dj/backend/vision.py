@@ -205,7 +205,7 @@ if __name__ == "__main__":
         if frame is not None:
             cv2.putText(frame, f"people:{len(boxes)}  motion:{motion:.3f}",
                         (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
-            cv2.imshow("PASS THE AUX — Vision", frame)
+            cv2.imshow("Vibe Check — Vision", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
     vp.stop()

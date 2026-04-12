@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI):
     audio_meter.stop()
 
 
-app = FastAPI(title="PASS THE AUX", lifespan=lifespan)
+app = FastAPI(title="Vibe Check", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

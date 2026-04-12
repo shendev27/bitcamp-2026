@@ -76,7 +76,7 @@ export default function App() {
             className="text-xl font-extrabold tracking-widest"
             style={{ color: theme.accent, textShadow: `0 0 30px ${theme.glow}` }}
           >
-            PASS THE AUX
+            VIBE CHECK
           </h1>
         </div>
 
