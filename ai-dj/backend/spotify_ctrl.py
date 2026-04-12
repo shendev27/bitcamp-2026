@@ -184,18 +184,19 @@ class SpotifyController:
             return
         try:
             start_vol = self._get_volume()
+            min_vol = min(50, start_vol)
             steps = max(2, SPOTIFY_FADE_STEPS)
             step_delay = (SPOTIFY_FADE_MS / steps) / 1000.0
 
             for i in range(steps):
-                v = start_vol * (1 - (i + 1) / steps)
+                v = max(min_vol, start_vol * (1 - (i + 1) / steps))
                 self._set_volume(v)
                 time.sleep(step_delay)
 
             self._start_playback(playlist_uri, track_index, position_ms)
 
             for i in range(steps):
-                v = start_vol * ((i + 1) / steps)
+                v = min(start_vol, min_vol + (start_vol - min_vol) * ((i + 1) / steps))
                 self._set_volume(v)
                 time.sleep(step_delay)
         finally:
