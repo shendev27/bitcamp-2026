@@ -9,6 +9,7 @@ from spotipy.oauth2 import SpotifyOAuth
 from config import (
     SPOTIPY_CLIENT_ID, SPOTIPY_CLIENT_SECRET,
     SPOTIPY_REDIRECT_URI, SPOTIFY_SCOPES,
+    SPOTIFY_TRACK_POLL_S,
     SPOTIFY_FADE_MS, SPOTIFY_FADE_STEPS,
     ACTION_MAP, MOOD_TRACK_STARTS,
 )
@@ -33,6 +34,9 @@ class SpotifyController:
         self._last_start_ms: int | None = None
         self._last_track_index: int | None = None
         self._last_track_id: str | None = None   # used to detect natural track advance
+        self._last_track_fetch: float = 0.0
+        self._track_cache: dict = _BLANK_TRACK
+        self._rate_limited_until: float = 0.0
 
     def connect(self):
         """Authenticate via Authorization Code Flow.  Stores token cache in .cache."""
@@ -102,10 +106,17 @@ class SpotifyController:
         """Return current track info as dict with name/artist/art_url keys."""
         if not self._sp:
             return _BLANK_TRACK
+        now = time.time()
+        if now < self._rate_limited_until:
+            return self._track_cache
+        if now - self._last_track_fetch < SPOTIFY_TRACK_POLL_S:
+            return self._track_cache
         try:
             pb = self._sp.current_playback()
             if not pb or not pb.get("item"):
-                return _BLANK_TRACK
+                self._track_cache = _BLANK_TRACK
+                self._last_track_fetch = now
+                return self._track_cache
             item = pb["item"]
             track_id = item.get("id")
             # Clear start metadata when Spotify has naturally advanced to a different track
@@ -115,15 +126,29 @@ class SpotifyController:
                 self._last_track_index = None
             art = item["album"]["images"][0]["url"] if item["album"]["images"] else ""
             artists = ", ".join(a["name"] for a in item["artists"])
-            return {
+            self._track_cache = {
                 "name": item["name"],
                 "artist": artists,
                 "art_url": art,
                 "start_ms": self._last_start_ms,
                 "start_track_index": self._last_track_index,
             }
+            self._last_track_fetch = now
+            return self._track_cache
+        except spotipy.SpotifyException as exc:
+            retry = None
+            if hasattr(exc, "headers") and exc.headers:
+                retry = exc.headers.get("Retry-After")
+            if retry:
+                try:
+                    self._rate_limited_until = now + int(retry)
+                except Exception:
+                    pass
+            self._last_track_fetch = now
+            return self._track_cache
         except Exception:
-            return _BLANK_TRACK
+            self._last_track_fetch = now
+            return self._track_cache
 
     @property
     def is_active(self) -> bool:
@@ -143,6 +168,7 @@ class SpotifyController:
             self._last_start_ms = kwargs.get("position_ms") or 0
             self._last_track_index = track_index
             self._last_track_id = None   # will be set on next current_track() call
+            self._last_track_fetch = 0.0  # force next current_track to refresh
         except spotipy.SpotifyException as exc:
             err = str(exc)
             if "NO_ACTIVE_DEVICE" in err:

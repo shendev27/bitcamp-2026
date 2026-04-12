@@ -121,6 +121,7 @@ SPOTIPY_CLIENT_ID     = os.getenv("SPOTIPY_CLIENT_ID", "")
 SPOTIPY_CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET", "")
 SPOTIPY_REDIRECT_URI  = os.getenv("SPOTIPY_REDIRECT_URI", "http://localhost:8888/callback")
 SPOTIFY_SCOPES        = "user-modify-playback-state user-read-playback-state"
+SPOTIFY_TRACK_POLL_S  = float(os.getenv("SPOTIFY_TRACK_POLL_S", "3.0"))
 SPOTIFY_FADE_MS       = int(os.getenv("SPOTIFY_FADE_MS", 1200))
 SPOTIFY_FADE_STEPS    = int(os.getenv("SPOTIFY_FADE_STEPS", 6))
 
