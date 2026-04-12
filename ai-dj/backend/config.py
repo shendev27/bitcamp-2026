@@ -9,14 +9,14 @@ load_dotenv()
 WEBCAM_INDEX = int(os.getenv("WEBCAM_INDEX", 0))
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
-CAPTURE_FPS = 6
+CAPTURE_FPS = 25
 BROADCAST_HZ = 4
 
 # ── YOLO ──────────────────────────────────────────────────────────────────────
 YOLO_MODEL = "yolov8n.pt"
 YOLO_IMGSZ = 320
 YOLO_CONF = 0.4
-YOLO_EVERY_N = int(os.getenv("YOLO_EVERY_N", 2))  # 6 fps / 2 = 3 yolo runs/sec
+YOLO_EVERY_N = int(os.getenv("YOLO_EVERY_N", 3))  # inference thread runs YOLO every 3rd cycle
 
 # ── Emotion ───────────────────────────────────────────────────────────────────
 MAX_FACES = 5

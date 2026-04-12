@@ -18,8 +18,13 @@ _EMOTION_KEYS = ["angry", "disgust", "fear", "happy", "sad", "surprise", "neutra
 
 class VisionProcessor:
     """
-    Single background thread: webcam → YOLO person detect → DeepFace emotion →
-    annotated frame. Exposes latest results thread-safely.
+    Two background threads:
+      - _capture_loop: reads camera at ~CAPTURE_FPS, annotates with latest
+        detection results, exposes frame for MJPEG streaming. Never blocked
+        by inference.
+      - _infer_loop: woken by Event whenever a new raw frame arrives; runs
+        YOLO + DeepFace and updates detection state.
+    Public API (get_frame / get_state) is unchanged.
     """
 
     def __init__(self):
@@ -27,54 +32,63 @@ class VisionProcessor:
         self._cap: cv2.VideoCapture | None = None
 
         self._lock = threading.Lock()
-        self._latest_frame: np.ndarray | None = None   # annotated BGR
+        self._new_frame_event = threading.Event()
+
+        # Shared state (protected by _lock)
+        self._latest_frame: np.ndarray | None = None   # annotated BGR for MJPEG
+        self._latest_raw: np.ndarray | None = None     # raw BGR for inference
         self._latest_boxes: list[tuple] = []           # (x1,y1,x2,y2,conf)
-        self._latest_emotions: list[dict] = []         # per-face emotion dicts
+        self._latest_emotions: list[dict] = []
         self._latest_motion: float = 0.0
+
+        # Infer-thread-only state (no lock needed)
+        self._prev_gray: np.ndarray | None = None
         self._last_boxes: list[tuple] = []
         self._last_top_boxes: list[tuple] = []
-        self._last_emotions: list[dict] = []
-        self._frame_idx = 0
-
-        self._prev_gray: np.ndarray | None = None
+        self._last_emotions_infer: list[dict] = []
         self._emotion_counters: dict[int, int] = {}
         self._emotion_cache: dict[int, dict] = {}
 
         self._running = False
-        self._thread: threading.Thread | None = None
+        self._capture_thread: threading.Thread | None = None
+        self._infer_thread: threading.Thread | None = None
 
     # ── public API ────────────────────────────────────────────────────────────
 
     def start(self):
-        """Open camera and start the background processing thread."""
+        """Open camera and start both background threads."""
         if os.name == "nt":
             self._cap = cv2.VideoCapture(WEBCAM_INDEX, cv2.CAP_DSHOW)
         else:
             self._cap = cv2.VideoCapture(WEBCAM_INDEX)
         if not self._cap or not self._cap.isOpened():
             print(f"[VISION] Failed to open camera index {WEBCAM_INDEX}.")
+            return
         self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
         self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
         self._cap.set(cv2.CAP_PROP_FPS, CAPTURE_FPS)
         if os.name == "nt":
             self._cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
         self._running = True
-        self._thread = threading.Thread(target=self._loop, daemon=True)
-        self._thread.start()
+        self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
+        self._infer_thread = threading.Thread(target=self._infer_loop, daemon=True)
+        self._capture_thread.start()
+        self._infer_thread.start()
 
     def stop(self):
-        """Stop the thread and release the camera."""
+        """Stop both threads and release the camera."""
         self._running = False
+        self._new_frame_event.set()   # unblock infer thread if waiting
         if self._cap:
             self._cap.release()
 
     def get_frame(self) -> np.ndarray | None:
-        """Return the latest annotated BGR frame (YOLO boxes + emotion labels)."""
+        """Return the latest annotated BGR frame."""
         with self._lock:
             return self._latest_frame.copy() if self._latest_frame is not None else None
 
     def get_state(self) -> tuple[list[tuple], list[dict], float]:
-        """Return (boxes, emotions, motion_score) from the latest frame."""
+        """Return (boxes, emotions, motion_score) from the latest inference."""
         with self._lock:
             return (
                 list(self._latest_boxes),
@@ -82,22 +96,63 @@ class VisionProcessor:
                 self._latest_motion,
             )
 
-    # ── internal ──────────────────────────────────────────────────────────────
+    # ── Thread 1: capture ─────────────────────────────────────────────────────
 
-    def _loop(self):
+    def _capture_loop(self):
+        """Read camera at ~CAPTURE_FPS. Annotate with latest detection results.
+        Never blocks on YOLO/DeepFace — always streams fresh frames."""
         delay = 1.0 / CAPTURE_FPS
         while self._running:
             t0 = time.time()
             ok, frame = self._cap.read()
             if not ok:
-                time.sleep(0.05)
+                time.sleep(0.02)
                 continue
 
             frame = cv2.resize(frame, (FRAME_WIDTH, FRAME_HEIGHT))
-            self._frame_idx += 1
-            run_yolo = (self._frame_idx % max(1, YOLO_EVERY_N)) == 0
 
-            # YOLO — person detection (skip frames for FPS)
+            # Share raw frame with inference thread
+            with self._lock:
+                self._latest_raw = frame
+            self._new_frame_event.set()
+
+            # Snapshot latest detection results (brief lock — just list copy)
+            with self._lock:
+                boxes = list(self._latest_boxes)
+                emotions = list(self._latest_emotions)
+
+            # Draw and expose (outside lock — memcpy is slow)
+            annotated = self._draw(frame, boxes, emotions)
+            with self._lock:
+                self._latest_frame = annotated
+
+            elapsed = time.time() - t0
+            time.sleep(max(0, delay - elapsed))
+
+    # ── Thread 2: inference ───────────────────────────────────────────────────
+
+    def _infer_loop(self):
+        """Run YOLO + DeepFace + motion whenever a new raw frame is ready."""
+        infer_idx = 0
+        while self._running:
+            self._new_frame_event.wait(timeout=0.1)
+            self._new_frame_event.clear()
+
+            with self._lock:
+                frame = self._latest_raw
+            if frame is None:
+                continue
+
+            # Motion score (fast — runs every inference cycle)
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            motion = 0.0
+            if self._prev_gray is not None:
+                diff = cv2.absdiff(gray, self._prev_gray).astype(np.float32)
+                motion = float(np.mean(diff) / 255.0)
+            self._prev_gray = gray
+
+            # YOLO person detection (every YOLO_EVERY_N inference cycles)
+            run_yolo = (infer_idx % max(1, YOLO_EVERY_N)) == 0
             if run_yolo:
                 results = self._model(frame, imgsz=YOLO_IMGSZ, conf=YOLO_CONF,
                                       classes=[0], verbose=False)
@@ -111,7 +166,6 @@ class VisionProcessor:
             else:
                 boxes = self._last_boxes
 
-            # Sort by area, take top MAX_FACES
             sorted_boxes = sorted(boxes, key=lambda b: (b[2]-b[0])*(b[3]-b[1]), reverse=True)
             top_boxes = sorted_boxes[:MAX_FACES]
             if run_yolo:
@@ -119,32 +173,21 @@ class VisionProcessor:
             else:
                 top_boxes = self._last_top_boxes
 
-            # Motion score
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            motion = 0.0
-            if self._prev_gray is not None:
-                diff = cv2.absdiff(gray, self._prev_gray).astype(np.float32)
-                motion = float(np.mean(diff) / 255.0)
-            self._prev_gray = gray
-
-            # DeepFace emotion — cached per slot; run less often
+            # DeepFace emotion (per-slot caching, only when YOLO ran)
             if run_yolo:
                 emotions = self._run_emotions(frame, top_boxes)
-                self._last_emotions = emotions
+                self._last_emotions_infer = emotions
             else:
-                emotions = self._last_emotions
-
-            # Draw annotations
-            annotated = self._draw(frame, top_boxes, emotions)
+                emotions = self._last_emotions_infer
 
             with self._lock:
-                self._latest_frame = annotated
-                self._latest_boxes = boxes          # all boxes for people_count
+                self._latest_boxes = boxes
                 self._latest_emotions = emotions
                 self._latest_motion = motion
 
-            elapsed = time.time() - t0
-            time.sleep(max(0, delay - elapsed))
+            infer_idx += 1
+
+    # ── helpers ───────────────────────────────────────────────────────────────
 
     def _run_emotions(self, frame: np.ndarray, boxes: list[tuple]) -> list[dict]:
         """Run DeepFace on face crops with per-slot frame skipping."""
@@ -170,7 +213,6 @@ class VisionProcessor:
             if idx in self._emotion_cache:
                 emotions.append(self._emotion_cache[idx])
 
-        # Prune stale slots
         for k in list(self._emotion_cache):
             if k not in active:
                 del self._emotion_cache[k]
