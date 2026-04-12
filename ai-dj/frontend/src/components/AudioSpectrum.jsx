@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 
 const SEGMENTS = 24
-const GAIN = 4
+const GAIN = 3
 
 function segmentColor(i, total) {
   const hue = Math.round(120 - (i / (total - 1)) * 120)
